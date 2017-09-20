@@ -132,7 +132,13 @@ main() {
             exitWithError "error: $errorMessage"
         fi
 
-        at "$TIMESPEC" <<< "$scriptFile"
+        {
+            echo "export DISPLAY=$DISPLAY"
+            echo "export XAUTHORITY=$XAUTHORITY"
+            # dbus or notifications might still not work
+            cat "$scriptFile"
+        } \
+            | at "$TIMESPEC"
     fi
 
 }
