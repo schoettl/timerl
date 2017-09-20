@@ -5,7 +5,10 @@
 
 printUsage() {
     cat <<EOF
-usage: $PROGNAME [options] TIMESPEC
+usage:
+  $PROGNAME [options] TIMESPEC
+  $PROGNAME -k
+  $PROGNAME -h
 
 options:
   -c SHELLCMD
@@ -16,6 +19,10 @@ options:
       force use of at (instead of sleep)
   -s
       silent, do not execute the alarm program
+  -k
+      kill alarm program if running
+  -h
+      print this help message
 
 The alarm program is $CONFIG_ALARM_PROGRAM (which can also be a symlink).
 
@@ -26,13 +33,15 @@ AT_SYNTAX    ::= complex
 EOF
 }
 
+set -o errexit -o pipefail
+
 readonly PROGNAME=$(basename "$0")
 
-readonly CONFIG_ALARM_PROGRAM=~/.config/timerl/alarm
+readonly CONFIG_ALARM_PROGRAM=~/.config/timerl/timerl_alarm
 
 # $*: command line arguments = "$@"
 parseCommandLine() {
-    while getopts "hc:m:as" OPTION; do
+    while getopts "hc:m:ask" OPTION; do
         case $OPTION in
             h) printUsage
                exit 0
@@ -41,11 +50,16 @@ parseCommandLine() {
             m) declare -gr ALARM_MESSAGE=$OPTARG ;;
             a) declare -gr FORCE_AT=1 ;;
             s) declare -gr SILENT=1 ;;
+            k) declare -gr KILL_ALARM=1 ;;
         esac
     done
     shift $((OPTIND-1))
 
-    if (( $# < 1 )); then
+    if [[ -n $KILL_ALARM ]]; then
+        if (( $# > 0 || OPTIND > 2 )); then
+            exitWithError "error: you can use -k alone only"
+        fi
+    elif (( $# < 1 )); then
         printUsage
         exit 1
     fi
@@ -61,6 +75,17 @@ exitWithError() {
     exit 1
 }
 
+killAlarmProgram() {
+    declare pids
+    pids=$(pidof -x timerl_alarm)
+    if (( ${#pids[@]} > 0 )); then
+        for pid in "${pids[@]}"; do
+            pkill -9 -P "$pid"
+            kill -9 "$pid"
+        done
+    fi
+}
+
 main() {
 
     # Check if notify-send is installed
@@ -72,6 +97,11 @@ main() {
 
     parseCommandLine "$@"
 
+    if [[ -n $KILL_ALARM ]]; then
+        killAlarmProgram
+        exit
+    fi
+
     declare alarmMessage=${ALARM_MESSAGE:-alarm}
     alarmMessage=${alarmMessage/\"/}
 
@@ -80,7 +110,6 @@ main() {
     cat <<-EOT > "$scriptFile"
 	notify-send -t 0 -i info -u critical "$PROGNAME" "$alarmMessage (set at $(date +'%F %T'))"
 	EOT
-    # TODO a good default alarm? flashing screen?
 
     if [[ -z $SILENT && -x $CONFIG_ALARM_PROGRAM ]]; then
         echo "$CONFIG_ALARM_PROGRAM &" >> "$scriptFile"
