@@ -27,7 +27,8 @@ Dependencies
 ------------
 
 - A system notification service must be installed (comes with most modern desktop
-  environments like Gnome, KDE, Ubuntu).
+  environments like Gnome, KDE, Ubuntu). An example for a light-weight notification
+  service is [dunst](https://github.com/dunst-project/dunst).
 - `notify-send` must be installed to interact with the notification service.
 - When using `timerl` with fixed times (as in the third example), the `atd` service
   must be installed to allow scheduled tasks using `at`.
